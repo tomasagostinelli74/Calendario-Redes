@@ -1,93 +1,77 @@
-# Calendario de contenidos: instalación
+# Calendario de contenidos: instalación con Supabase
 
-Son 3 archivos más la planilla base:
+La app (`index.html`) guarda todo en una base de datos de **Supabase** y los cambios de cada uno aparecen **en tiempo real** en la pantalla de los demás.
 
-| Archivo | Para qué sirve |
-|---|---|
-| `Calendario UADE - Base.xlsx` | Tus 389 contenidos ya migrados, más las hojas **Config** y **Papelera** |
-| `apps-script/Code.gs` | El backend: lee y escribe en la planilla |
-| `apps-script/Index.html` | La app (vista Contenidos + vista Gantt) |
-| `apps-script/appsscript.json` | Zona horaria del proyecto (opcional) |
+## 1. Crear el proyecto en Supabase (3 min)
+1. Entrá a [supabase.com](https://supabase.com) y creá una cuenta (el plan gratis alcanza).
+2. Tocá **New project**:
+   - **Name:** `calendario-redes`
+   - **Database password:** inventá una y guardala (para la app no se usa, pero Supabase la pide).
+   - **Region:** **South America (São Paulo)**, que es la más cercana.
+3. Esperá 1 o 2 minutos a que termine de crearse.
 
-## 1. Subir la planilla a Google Sheets (2 min)
-1. Subí `Calendario UADE - Base.xlsx` a Google Drive.
-2. Abrila con Google Sheets y andá a **Archivo › Guardar como Hojas de cálculo de Google**. Desde ahí trabajás con esa copia.
-   - Si preferís seguir usando la planilla de siempre: en ella andá a **Archivo › Importar › Subir** y elegí el .xlsx con la opción **"Insertar hojas nuevas"**. Se agregan las hojas Contenidos, Config y Papelera.
+## 2. Crear las tablas y cargar los datos (1 min)
+1. En el menú de la izquierda, entrá a **SQL Editor** › **New query**.
+2. Pegá **todo** el contenido de [`supabase/instalar.sql`](supabase/instalar.sql) y tocá **Run**.
+3. Abajo tiene que aparecer `contenidos_cargados: 38`. Esos son los contenidos que había en la Google Sheet, con sus estados actuales.
 
-## 2. Pegar el código (3 min)
-1. En la planilla: **Extensiones › Apps Script**.
-2. Borrá todo lo que hay en `Código.gs` y pegá el contenido de `Code.gs`.
-3. Hacé clic en **＋ › HTML**, ponele de nombre **`Index`** (exacto, sin ".html") y pegá el contenido de `Index.html`.
-4. En **⚙ Configuración del proyecto**, elegí la zona horaria **(GMT-03:00) Buenos Aires**.
-5. Guardá (Ctrl+S).
+El script crea las tablas, los permisos y el tiempo real. Se puede ejecutar más de una vez: no duplica nada.
 
-## 3. Ejecutar `setup` una vez
-En el editor, elegí la función **`setup`** en el desplegable de arriba y tocá **Ejecutar**. Google te va a pedir permisos: aceptalos. Si aparece "Google no verificó esta app", entrá a *Configuración avanzada › Ir a (proyecto)*. Es tu propio script.
+## 3. Copiar las dos claves
+Tocá el botón **Connect**, arriba, o andá a **Project Settings › API Keys / Data API**, y copiá:
+- **Project URL**, que se ve así: `https://abcdefghijkl.supabase.co`.
+- La clave **pública**, que puede aparecer de dos maneras:
+  - como **Publishable key** (empieza con `sb_publishable_…`),
+  - o como **anon public**, en la sección *Legacy API keys*.
 
-`setup` hace esto:
-- ordena las columnas y los formatos de fecha,
-- arma los desplegables de Estado, Formato y Red en la planilla,
-- instala un disparador para que, si alguien edita **a mano en la planilla**, la app también se entere.
+> ⚠️ **Nunca** uses la clave **secret** ni la **service_role**. Esas dan acceso total a la base y no pueden ir en una página web.
 
-## 4. Publicar como aplicación web
-1. **Implementar › Nueva implementación** › tipo **Aplicación web**.
-2. **Ejecutar como:** *Yo*.
-3. **Quién tiene acceso:** *Cualquier usuario de UADE* (si usan cuentas institucionales) o *Cualquier usuario con cuenta de Google*.
-4. **Implementar** y copiá la URL. **Esa URL es la que comparten con el equipo** (conviene guardarla en favoritos).
+Pegalas en `index.html`, en estas dos líneas (están cerca de la línea 500):
+```js
+const SUPABASE_URL = 'https://abcdefghijkl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_...';
+```
+Después subí el cambio a GitHub y Vercel lo publica solo.
 
-> Con "Ejecutar como: Yo", tus compañeros no necesitan acceso a la planilla para usar la app. Igual podés compartirles la planilla si quieren verla o editarla directo.
->
-> **Importante:** cualquiera que tenga acceso a la URL puede modificar el calendario. Por eso conviene restringirla a UADE y no usar "Cualquier persona".
-
-### Usar el `Index.html` suelto (fuera de Apps Script)
-El `Index.html` ya tiene adentro la URL de la implementación (`EXEC_URL`), así que también funciona abierto como archivo o subido a cualquier web. Para que se pueda conectar:
-- la implementación tiene que tener **Quién tiene acceso: Cualquier persona** (si no, el navegador bloquea la conexión),
-- en Apps Script tiene que estar pegado el `Code.gs` nuevo (incluye `doPost` y las respuestas en JSON) y publicada una **nueva versión**.
-
-Con acceso "Cualquier persona", **cualquiera que tenga el HTML o la URL puede leer y modificar el calendario**. No lo publiques en lugares abiertos.
-
-Si la planilla está vacía, la app ofrece el botón **"Cargar contenidos programados"**, que sube los 38 contenidos que trae el HTML.
-
-### Cuando cambies el código
-Andá a **Implementar › Administrar implementaciones › ✏️ › Versión: Nueva versión › Implementar**. La URL sigue siendo la misma.
+Hasta que pongas las claves, la app funciona en modo local: muestra los 38 contenidos y guarda los cambios **solo en ese navegador**.
 
 ---
 
 ## Cómo se usa
 
-**Período (arriba):** Día · Semana · Mes · 2 meses · 3 meses · Rango · Todo. Las flechas ‹ › avanzan y retroceden. Si hacés clic en el nombre del período (por ejemplo "Octubre 2026") podés saltar a cualquier fecha. En *Rango* elegís el desde y el hasta.
+**Período (arriba):** Día · Semana · Mes · 2 meses · 3 meses · Rango · Todo. Las flechas ‹ › avanzan y retroceden. Si hacés clic en el nombre del período, podés saltar a cualquier fecha.
 
-**Filtros:** el buscador, Formato, Red y Responsable. Los chips de estado muestran cuántos contenidos hay de cada uno en el período: con un clic lo mostrás u ocultás, con doble clic ves solo ese estado. *Solo pendientes* oculta lo publicado y lo descartado.
+**Filtros:** el buscador, Formato, Red y Responsable. Los chips de estado muestran cuántos contenidos hay de cada uno: con un clic lo mostrás u ocultás, con doble clic ves solo ese estado.
 
-**Vista Contenidos:** es la lista día por día. Los días futuros **sin contenido** aparecen en amarillo para que se vean los huecos.
-- Estado, título, formato, red y responsable se editan ahí mismo.
-- Para pasar un contenido a otro día, **arrastralo desde ⋮⋮** o usá el ícono de calendario.
-- Con **›** abrís el detalle: notas o copy, link, inicio de producción, duplicar, eliminar e **intercambiar fecha con otro contenido** (para cuando lo de hoy se pasa a otro día y viceversa).
+**Vista Contenidos:** es la lista día por día. Los días futuros **sin contenido** aparecen en amarillo. Todo se edita ahí mismo. Para pasar un contenido a otro día, arrastralo desde ⋮⋮ o usá el ícono de calendario. Con **›** abrís el detalle: notas, link, inicio de producción, duplicar, eliminar e **intercambiar fecha con otro contenido**.
 
-**Vista Gantt:** cada contenido es una fila. El **rombo** marca la fecha de publicación y la **barra** el período de producción (desde "Inicio de producción"). Si arrastrás el rombo, cambia la fecha. Si arrastrás la barra, se mueve todo. Si arrastrás el borde izquierdo, cambia el inicio. Además podés agrupar por estado, formato, red o responsable y hacer zoom (− Ajustar +). Si hacés clic en un día del encabezado, se abre ese día en la lista.
+**Vista Gantt:** el **rombo** marca la fecha de publicación y la **barra** el período de producción. Para cambiar la fecha, arrastrá el rombo; para mover todo, arrastrá la barra. Se puede agrupar y hacer zoom.
 
-**Exportar a PDF:** en la vista Gantt, el botón **Exportar PDF** arma una sola hoja **A4 o A3**, horizontal o vertical, a color y siempre en tema claro. Exporta lo que estás viendo: el período, los filtros y la agrupación actuales. Si son muchos contenidos para una hoja, te avisa antes y te sugiere A3 o un período más corto.
+**Exportar a PDF:** está en la vista Gantt, con el botón **Exportar PDF**. Arma una sola hoja **A4 o A3**, horizontal o vertical, a color y en tema claro, con el período, los filtros y la agrupación actuales.
 
-**Tema:** la app arranca en claro. El botón de la luna, arriba a la derecha, la pasa a oscuro y queda guardado en ese navegador.
+**Tema:** la app arranca en claro. El botón de la luna, arriba a la derecha, la pasa a oscuro.
 
-**Deshacer:** cada vez que movés, intercambiás o cambiás un estado aparece un aviso con **Deshacer**.
+**Deshacer:** cada vez que movés, intercambiás o cambiás un estado, aparece **Deshacer**.
 
-**Atajos:** `N` nuevo · `/` buscar · `T` hoy · `←` `→` período anterior/siguiente · `G` cambiar de vista · `Esc` cerrar.
+**Atajos:** `N` nuevo · `/` buscar · `T` hoy · `←` `→` período · `G` cambiar de vista · `Esc` cerrar.
 
-## Cómo funciona la sincronización
-- Cada cambio se guarda en la planilla al instante. Arriba a la derecha dice *Guardando…* y después *Sincronizado*.
-- Cada ~12 segundos (y cada vez que volvés a la pestaña) la app revisa si alguien cambió algo y se actualiza sola.
+## Sincronización
+- Cada cambio se guarda al instante en Supabase y les aparece a los demás en el momento. Arriba a la derecha dice **En vivo**.
+- Además, cada 30 segundos la app verifica que no se haya perdido nada (por ejemplo, si se cortó internet).
 - Si dos personas editan **campos distintos** del mismo contenido, se conservan los dos cambios. Si editan **el mismo campo**, queda el último y la app avisa.
-- En cada fila, la planilla registra quién hizo el último cambio y cuándo. Tu nombre se configura con el botón **"¿Quién sos?"** de arriba.
-- Lo que se elimina desde la app **no se pierde**: pasa a la hoja **Papelera**.
+- Tu nombre se configura con el botón **"¿Quién sos?"** y queda registrado en cada cambio (columna `por`).
 
-## Personalizar
-Desde la hoja **Config** podés agregar o renombrar **estados** (con su color en hexadecimal), **formatos** y **redes**. La app los toma en la próxima actualización.
+## Recuperar algo eliminado
+"Eliminar" no borra: marca la fila. Para recuperarla, entrá en Supabase a **Table Editor › contenidos**, buscá la fila (tiene completo `eliminado_at`), borrá ese valor y guardá. Vuelve a aparecer en la app.
 
-## Qué se hizo con tu Excel original
-- Se tomó la hoja **"2025"**. La hoja **"FACE"** es una copia más vieja de esa misma información (no tiene ninguna fila que no esté en "2025"), así que no se importó por separado.
-- Las filas con contenido pasaron a la hoja **Contenidos** (389 en total). Los días vacíos no se copiaron, porque ahora la app los muestra sola.
-- Los contenidos **sin estado** (los ideados de fines de octubre y noviembre) quedaron como **"Idea"**.
-- **Formato:** se completó a partir del link (los /reel/ como *Reel* y los /p/ como *Post*). Los que no tenían link quedaron vacíos.
-- **Red:** se puso *Instagram* en todos, porque todos los links eran de Instagram. Se puede cambiar.
-- Hay 2 filas que tenían link pero no título (9/4/2025 y 13/5/2025). Quedaron como "(sin título)".
+## Personalizar estados, formatos y redes
+En **Table Editor › opciones** podés agregar filas:
+- `tipo` puede ser `estado`, `formato` o `red`.
+- `nombre` es el texto que se muestra.
+- `color` es solo para estados, en hexadecimal (por ejemplo `#22C55E`).
+- `orden` define el orden en los desplegables.
+
+## Seguridad: leelo
+La clave pública va dentro del `index.html`, así que **quien tenga el link de la app puede ver y editar el calendario**. Lo que no puede hacer es borrar definitivamente. Para un equipo chico con el link compartido solo entre ustedes suele alcanzar. Si más adelante necesitan restringirlo, se puede agregar un inicio de sesión con el mail de cada uno.
+
+Además, en el plan gratis Supabase **pausa los proyectos que no se usan durante 7 días**. Con el uso diario no pasa. Si pasara, se reactiva desde el panel de Supabase con un clic.

@@ -7,6 +7,7 @@
 <title>Calendario de contenidos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -344,7 +345,7 @@ kbd{font:11px/1 ui-monospace,monospace;border:1px solid var(--border-strong);bor
     <span class="sync" id="sync" data-s="loading"><i></i><span>Conectando…</span></span>
     <span id="whoWrap"></span>
     <button class="icon-btn" id="themeBtn" title="Cambiar tema claro / oscuro"></button>
-    <a class="icon-btn" id="sheetLink" target="_blank" rel="noopener" title="Abrir la planilla de Google Sheets" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 9v12"/></svg></a>
+    <a class="icon-btn" id="sheetLink" target="_blank" rel="noopener" title="Abrir la base de datos en Supabase" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/></svg></a>
     <button class="btn primary" id="btnNew" title="Nuevo contenido (N)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nuevo</span></button>
   </div>
 </header>
@@ -446,7 +447,7 @@ const D = {
 };
 
 /* =====================================================================
-   Contenidos programados (se usan mientras la app no está conectada a la planilla)
+   Contenidos programados (se usan mientras la app no está conectada a Supabase)
    ===================================================================== */
 const SEED = [
   {"id": "s001", "fecha": "2026-09-25", "titulo": "Institucional Colagreco 1", "estado": "Publicado", "formato": "Post", "red": "Instagram", "link": "https://www.instagram.com/p/DdtwDvZB3rN/", "notas": "", "inicio": "", "responsable": "", "actualizado": "", "por": "", "version": 1},
@@ -490,65 +491,115 @@ const SEED = [
 ];
 
 /* =====================================================================
-   Backend: Apps Script (google.script.run) o modo demo local
+   Backend: Supabase (o modo local si todavía no está configurado)
    ===================================================================== */
-// URL de la aplicación web de Apps Script (Implementar › Administrar implementaciones)
-const EXEC_URL = 'https://script.google.com/macros/s/AKfycbwdrR__gGyz6IZt33PX0tRV-3tSkV5PXp7byCsfUdHhcWUgSpnoPtWyKOM_9u3GRvpR/exec';
+// Supabase › Project Settings › API (o "Connect"): URL del proyecto y clave pública (anon / publishable).
+// Es seguro ponerlas acá: la clave pública solo puede hacer lo que permiten las políticas de supabase/instalar.sql.
+// NUNCA pegues acá la clave "service_role" / "secret".
+const SUPABASE_URL = '';
+const SUPABASE_KEY = '';
 
-const IS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
-let MODE = IS_GAS ? 'gas' : EXEC_URL ? 'remote' : 'local';
-let api = MODE === 'gas' ? gasApi() : MODE === 'remote' ? remoteApi() : demoApi();
+const DEFAULT_CONFIG = { estados:[['Idea','#94A3B8'],['En curso','#3B82F6'],['Faltan tomas','#F97316'],['En proceso de revisión','#A855F7'],['Aceptada','#14B8A6'],['Para publicar','#EAB308'],['Programado','#6366F1'],['Publicado','#22C55E'],['no se publica','#78716C'],['ELIMINADO','#EF4444']].map(([nombre,color])=>({nombre,color})), formatos:['Reel','Post','Carrusel','Historia','Video','Otro'], redes:['Instagram','TikTok','LinkedIn','Facebook','YouTube','X'] };
 
-function remoteApi(){
-  // HTML abierto fuera de Apps Script: habla con la aplicación web por fetch.
-  // GET para leer y POST text/plain para escribir (así no hay preflight CORS).
-  async function unwrap(res){
-    if (!res.ok) throw new Error('El servidor respondió ' + res.status + '. Revisá que la implementación tenga acceso "Cualquier persona".');
-    const txt = await res.text();
-    let j; try { j = JSON.parse(txt); } catch (e){
-      throw new Error('La URL no devolvió datos. ¿Pegaste el Code.gs nuevo y publicaste una nueva versión de la implementación?');
-    }
-    if (!j.ok) throw new Error(j.error || 'Error en el script');
-    return j.data;
+let MODE = SUPABASE_URL && SUPABASE_KEY ? 'supabase' : 'local';
+let api;
+try { api = MODE === 'supabase' ? supabaseApi() : demoApi(); }
+catch (e){ api = { getData: () => Promise.reject(e), getRev: () => Promise.reject(e) }; }
+
+function supabaseApi(){
+  if (!window.supabase || !window.supabase.createClient) throw new Error('No se pudo cargar la librería de Supabase. Revisá la conexión a internet.');
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  const T = 'contenidos';
+  const COLS = 'id,fecha,titulo,estado,formato,red,link,notas,inicio,responsable,actualizado,por,version';
+  const EDIT = ['fecha','titulo','estado','formato','red','link','notas','inicio','responsable'];
+  const ref = (SUPABASE_URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1];
+  const fromRow = r => ({
+    id: r.id, fecha: r.fecha || '', titulo: r.titulo || '', estado: r.estado || 'Idea', formato: r.formato || '',
+    red: r.red || '', link: r.link || '', notas: r.notas || '', inicio: r.inicio || '', responsable: r.responsable || '',
+    actualizado: r.actualizado || '', por: r.por || '', version: r.version || 1,
+  });
+  const toRow = (o, who) => {
+    const r = {};
+    EDIT.forEach(k => { if (k in o) r[k] = (k === 'fecha' || k === 'inicio') ? (D.valid(o[k]) ? o[k] : null) : (o[k] ?? ''); });
+    r.por = String(who || '').slice(0, 60);
+    return r;
+  };
+  // traduce los errores de Supabase a algo accionable
+  function friendly(e){
+    const m = String((e && (e.message || e.details || e.hint)) || e || '');
+    if (/does not exist|Could not find the table|schema cache/i.test(m)) return 'Faltan las tablas en Supabase: ejecutá supabase/instalar.sql en el SQL Editor.';
+    if (/Invalid API key|No API key|JWT|apikey|401/i.test(m)) return 'La clave de Supabase no es válida. Revisá SUPABASE_KEY en el index.html.';
+    if (/row-level security|permission denied/i.test(m)) return 'Supabase rechazó el cambio por permisos. Volvé a ejecutar supabase/instalar.sql.';
+    if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'No hay conexión con Supabase. Revisá internet o la URL del proyecto (SUPABASE_URL).';
+    return m;
   }
-  async function req(action, args){
-    let res;
-    try {
-      res = args === undefined
-        ? await fetch(EXEC_URL + '?action=' + action + '&_=' + Date.now(), { redirect: 'follow' })
-        : await fetch(EXEC_URL, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action, args }) });
-    } catch (e){
-      throw new Error('No se pudo conectar con la planilla. Lo más común: la implementación no tiene acceso "Cualquier persona", o no hay internet.');
-    }
-    return unwrap(res);
+  const chk = ({ data, error }) => { if (error) throw new Error(friendly(error)); return data; };
+  const wrap = fn => async (...a) => { try { return await fn(...a); } catch (e){ throw new Error(friendly(e)); } };
+
+  async function getRev(){
+    const { data, count, error } = await sb.from(T).select('actualizado', { count: 'exact' }).order('actualizado', { ascending: false }).limit(1);
+    if (error) throw new Error(friendly(error));
+    return (count || 0) + '|' + ((data && data[0] && data[0].actualizado) || '');
+  }
+  async function updateItem(id, patch, base, who){
+    const { data, error } = await sb.from(T).update(toRow(patch, who)).eq('id', id).select(COLS).maybeSingle();
+    if (error) throw new Error(friendly(error));
+    if (!data) throw new Error('El contenido ya no existe (quizás alguien lo eliminó). Recargá la página.');
+    return { item: fromRow(data), conflicted: !!base && data.version !== base + 1, rev: null };
   }
   return {
-    getData: () => req('getData'),
-    getRev: () => req('getRev'),
-    createItem: (d, w) => req('createItem', [d, w]),
-    createMany: (l, w) => req('createMany', [l, w]),
-    updateItem: (id, p, v, w) => req('updateItem', [id, p, v, w]),
-    updateMany: (c, w) => req('updateMany', [c, w]),
-    deleteItem: (id, w) => req('deleteItem', [id, w]),
+    sb, fromRow,
+    getRev: wrap(getRev),
+    getData: wrap(async () => {
+      let items = [];
+      for (let from = 0; ; from += 1000){
+        const page = chk(await sb.from(T).select(COLS).is('eliminado_at', null).order('fecha', { ascending: true, nullsFirst: true }).range(from, from + 999));
+        items = items.concat(page);
+        if (page.length < 1000) break;
+      }
+      const ops = await sb.from('opciones').select('tipo,nombre,color,orden').order('orden');
+      const o = (!ops.error && ops.data) || [];
+      const config = o.length ? {
+        estados: o.filter(x => x.tipo === 'estado').map(x => ({ nombre: x.nombre, color: x.color || '#94A3B8' })),
+        formatos: o.filter(x => x.tipo === 'formato').map(x => x.nombre),
+        redes: o.filter(x => x.tipo === 'red').map(x => x.nombre),
+      } : DEFAULT_CONFIG;
+      return { items: items.map(fromRow), config, rev: await getRev(), user: '', sheetUrl: ref ? 'https://supabase.com/dashboard/project/' + ref + '/editor' : '' };
+    }),
+    createItem: wrap(async (d, who) => ({ item: fromRow(chk(await sb.from(T).insert(toRow(d, who)).select(COLS).single())), rev: null })),
+    createMany: wrap(async (list, who) => ({ items: chk(await sb.from(T).insert(list.map(x => toRow(x, who))).select(COLS)).map(fromRow), rev: null })),
+    updateItem: wrap(updateItem),
+    updateMany: wrap(async (changes, who) => {
+      const res = await Promise.all(changes.map(c => updateItem(c.id, c.patch, c.baseVersion, who)));
+      return { items: res.map(r => r.item), conflicted: res.some(r => r.conflicted), rev: null };
+    }),
+    // "Eliminar" no borra: marca eliminado_at (se puede recuperar desde Supabase vaciando ese campo)
+    deleteItem: wrap(async (id, who) => { chk(await sb.from(T).update({ eliminado_at: new Date().toISOString(), por: String(who || '').slice(0, 60), eliminado_por: String(who || '').slice(0, 60) }).eq('id', id)); return { ok: true, rev: null }; }),
   };
 }
 
-function gasApi(){
-  const call = (fn, ...args) => new Promise((res, rej) =>
-    google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
-  return {
-    getData: () => call('getData'),
-    getRev: () => call('getRev'),
-    createItem: (d, w) => call('createItem', d, w),
-    createMany: (l, w) => call('createMany', l, w),
-    updateItem: (id, p, v, w) => call('updateItem', id, p, v, w),
-    updateMany: (c, w) => call('updateMany', c, w),
-    deleteItem: (id, w) => call('deleteItem', id, w),
-  };
+// Tiempo real: los cambios de los compañeros llegan al instante
+function subscribeRealtime(){
+  if (MODE !== 'supabase' || S.rt) return;
+  S.rt = api.sb.channel('calendario-contenidos')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'contenidos' }, onRemoteChange)
+    .subscribe(st => { S.live = st === 'SUBSCRIBED'; if (S.sync === 'ok') setSync('ok'); });
+}
+function onRemoteChange(p){
+  if (S.inflight || S.drag){ S.staleRemote = true; return; }
+  if (p.eventType === 'DELETE'){
+    const id = p.old && p.old.id;
+    S.items = S.items.filter(i => i.id !== id);
+  } else {
+    const r = p.new || {};
+    if (r.eliminado_at) S.items = S.items.filter(i => i.id !== r.id);
+    else merge(api.fromRow(r));
+  }
+  S.dirty = true; safeRender(); refreshDrawer();
 }
 
 function demoApi(){
-  // Sin Apps Script: arranca con los contenidos programados (SEED) y guarda los cambios en este navegador
+  // Sin Supabase configurado: arranca con los contenidos programados (SEED) y guarda los cambios en este navegador
   const KEY = 'calcont-local-data';
   let store = null, rev = 1;
   const wait = v => new Promise(r => setTimeout(() => r(JSON.parse(JSON.stringify(v))), 120));
@@ -558,7 +609,7 @@ function demoApi(){
     try { const d = JSON.parse(localStorage.getItem(KEY) || 'null'); if (d && Array.isArray(d.items)){ rev = d.rev || 1; return d.items; } } catch(e){}
     return JSON.parse(JSON.stringify(SEED));
   };
-  const cfg = { estados:[['Idea','#94A3B8'],['En curso','#3B82F6'],['Faltan tomas','#F97316'],['En proceso de revisión','#A855F7'],['Aceptada','#14B8A6'],['Para publicar','#EAB308'],['Programado','#6366F1'],['Publicado','#22C55E'],['no se publica','#78716C'],['ELIMINADO','#EF4444']].map(([nombre,color])=>({nombre,color})), formatos:['Reel','Post','Carrusel','Historia','Video','Otro'], redes:['Instagram','TikTok','LinkedIn','Facebook','YouTube','X'] };
+  const cfg = DEFAULT_CONFIG;
   const apply = (id, patch, w) => { const it = store.find(x => x.id === id); if (!it) throw new Error('El contenido ya no existe.'); Object.assign(it, patch); it.version++; stamp(it, w); return it; };
   const commit = v => { rev++; save(); return wait(Object.assign(v, { rev })); };
   // otra pestaña del mismo navegador modificó los datos
@@ -812,7 +863,7 @@ function renderList(){
     html = '<div class="lv-empty"><b>No hay contenidos en este período</b>Probá con otro rango o revisá los filtros de estado.</div>';
   }
   if (!S.items.length && MODE !== 'local'){
-    html = '<div class="lv-empty"><b>La planilla está vacía</b>¿Cargamos los ' + SEED.length + ' contenidos programados (25/9 al 25/11)?<br><br><button class="btn primary" data-act="seed">Cargar contenidos programados</button></div>';
+    html = '<div class="lv-empty"><b>La base de datos está vacía</b>¿Cargamos los ' + SEED.length + ' contenidos programados (25/9 al 25/11)?<br><br><button class="btn primary" data-act="seed">Cargar contenidos programados</button></div>';
   }
   const y = window.scrollY;
   main.innerHTML = html;
@@ -1260,8 +1311,13 @@ async function buildGanttPDF(size, orient){
 let Q = Promise.resolve();
 let flashId = null;
 function enqueue(fn){
-  S.inflight++; setSync('saving');
-  const p = Q.then(fn).finally(() => { S.inflight--; if (!S.inflight && S.sync !== 'error') setSync('ok'); if (!S.inflight && S.dirty) safeRender(); });
+  S.inflight++; S.writeSeq = (S.writeSeq || 0) + 1; setSync('saving');
+  const p = Q.then(fn).finally(() => {
+    S.inflight--;
+    if (!S.inflight && S.sync !== 'error') setSync('ok');
+    if (!S.inflight && S.staleRemote){ S.staleRemote = false; poll(true); }
+    else if (!S.inflight && S.dirty) safeRender();
+  });
   Q = p.catch(() => {});
   return p;
 }
@@ -1326,7 +1382,7 @@ function deleteItem(id){
   const idx = S.items.indexOf(it);
   S.items.splice(idx, 1); closeDrawer(); safeRender();
   enqueue(async () => {
-    try { const r = await api.deleteItem(id, S.user); noteRev(r.rev); toast('Movido a la hoja Papelera: “' + it.titulo + '”'); }
+    try { const r = await api.deleteItem(id, S.user); noteRev(r.rev); toast('Eliminado: “' + it.titulo + '”' + (MODE === 'supabase' ? '. Se puede recuperar desde Supabase.' : '')); }
     catch (e){ S.items.splice(idx, 0, it); S.dirty = true; fail(e); }
   });
 }
@@ -1411,7 +1467,7 @@ function setSync(s){
   S.sync = s;
   const el = $('#sync'); el.dataset.s = s;
   const n = new Date();
-  $('span', el).textContent = s === 'ok' ? 'Sincronizado ' + p2(n.getHours()) + ':' + p2(n.getMinutes()) :
+  $('span', el).textContent = s === 'ok' ? (S.live ? 'En vivo · ' : 'Sincronizado ') + p2(n.getHours()) + ':' + p2(n.getMinutes()) :
     s === 'saving' ? 'Guardando…' : s === 'error' ? 'Sin conexión · reintentando' : s === 'demo' ? 'Sin conectar · guardado en este navegador' : 'Conectando…';
   if (s === 'ok' && MODE === 'local'){ el.dataset.s = 'demo'; $('span', el).textContent = 'Sin conectar · guardado en este navegador'; }
 }
@@ -1424,19 +1480,25 @@ function applyData(d){
   if (d.sheetUrl){ $('#sheetLink').href = d.sheetUrl; $('#sheetLink').hidden = false; }
   renderWho();
 }
-let polling = false;
-async function poll(){
-  if (polling || document.hidden || S.inflight || S.drag) return;
+let polling = false, pollAgain = false;
+async function poll(force){
+  if (polling){ if (force) pollAgain = true; return; }
+  if ((document.hidden && !force) || S.drag) return;
+  if (S.inflight){ if (force) S.staleRemote = true; return; }
   polling = true;
   try {
-    const rev = await api.getRev();
-    if (rev !== S.rev && !S.inflight){
+    const seq = S.writeSeq;
+    const rev = force ? null : await api.getRev();
+    if (force || rev !== S.rev){
       const d = await api.getData();
-      if (!S.inflight){ applyData(d); S.dirty = true; safeRender(); refreshDrawer(); }
+      // si alguien de esta pestaña guardó algo mientras leíamos, estos datos ya son viejos: se vuelve a pedir
+      if (S.inflight || S.writeSeq !== seq) pollAgain = true;
+      else { applyData(d); S.dirty = true; safeRender(); refreshDrawer(); }
     }
     if (S.sync !== 'saving') setSync('ok');
   } catch (e){ setSync('error'); }
   polling = false;
+  if (pollAgain){ pollAgain = false; setTimeout(() => poll(true), 400); }
 }
 
 /* =====================================================================
@@ -1541,7 +1603,7 @@ function bindUI(){
       a.disabled = true; a.textContent = 'Cargando…';
       const list = SEED.map(({ id, version, actualizado, por, ...rest }) => rest);
       enqueue(async () => {
-        try { const r = await api.createMany(list, S.user); r.items.forEach(merge); noteRev(r.rev); S.dirty = true; toast(r.items.length + ' contenidos cargados en la planilla'); }
+        try { const r = await api.createMany(list, S.user); r.items.forEach(merge); noteRev(r.rev); S.dirty = true; toast(r.items.length + ' contenidos cargados'); }
         catch (e){ fail(e); S.dirty = true; }
       });
       return;
@@ -1651,11 +1713,13 @@ async function init(){
     S.ready = true;
     renderAll();
     setSync('ok');
-    clearInterval(pollTimer); pollTimer = setInterval(poll, 12000);
+    subscribeRealtime();
+    // respaldo por si se corta el tiempo real
+    clearInterval(pollTimer); pollTimer = setInterval(poll, MODE === 'supabase' ? 30000 : 12000);
   } catch (e){
     setSync('error');
-    $('#main').innerHTML = '<div class="fatal"><h3 style="margin-top:0">No se pudo conectar con la planilla</h3><p>' + esc((e && e.message) || e) + '</p>' +
-      '<p style="color:var(--muted)">En Apps Script: <b>Implementar › Administrar implementaciones › ✏️</b> → "Quién tiene acceso: <b>Cualquier persona</b>" y <b>Versión: Nueva versión</b>. Si la planilla es nueva, ejecutá antes la función <code>setup</code>.</p>' +
+    $('#main').innerHTML = '<div class="fatal"><h3 style="margin-top:0">No se pudo conectar con la base de datos</h3><p>' + esc((e && e.message) || e) + '</p>' +
+      '<p style="color:var(--muted)">Revisá que en Supabase hayas ejecutado <code>supabase/instalar.sql</code> (SQL Editor › Run) y que <code>SUPABASE_URL</code> y <code>SUPABASE_KEY</code> del index.html sean los de tu proyecto.</p>' +
       '<p><button class="btn primary" id="retryBtn">Reintentar</button> <button class="btn" id="offlineBtn">Usar sin conexión (solo en este navegador)</button></p></div>';
     $('#retryBtn').onclick = () => { $('#main').innerHTML = '<div class="loading"><div class="spin"></div>Conectando…</div>'; init(); };
     $('#offlineBtn').onclick = () => { MODE = 'local'; api = demoApi(); init(); };
