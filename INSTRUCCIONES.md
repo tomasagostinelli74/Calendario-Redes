@@ -66,6 +66,10 @@ Andá a **Implementar › Administrar implementaciones › ✏️ › Versión: 
 
 **Vista Gantt:** cada contenido es una fila. El **rombo** marca la fecha de publicación y la **barra** el período de producción (desde "Inicio de producción"). Si arrastrás el rombo, cambia la fecha. Si arrastrás la barra, se mueve todo. Si arrastrás el borde izquierdo, cambia el inicio. Además podés agrupar por estado, formato, red o responsable y hacer zoom (− Ajustar +). Si hacés clic en un día del encabezado, se abre ese día en la lista.
 
+**Exportar a PDF:** en la vista Gantt, el botón **Exportar PDF** arma una sola hoja **A4 o A3**, horizontal o vertical, a color y siempre en tema claro. Exporta lo que estás viendo: el período, los filtros y la agrupación actuales. Si son muchos contenidos para una hoja, te avisa antes y te sugiere A3 o un período más corto.
+
+**Tema:** la app arranca en claro. El botón de la luna, arriba a la derecha, la pasa a oscuro y queda guardado en ese navegador.
+
 **Deshacer:** cada vez que movés, intercambiás o cambiás un estado aparece un aviso con **Deshacer**.
 
 **Atajos:** `N` nuevo · `/` buscar · `T` hoy · `←` `→` período anterior/siguiente · `G` cambiar de vista · `Esc` cerrar.

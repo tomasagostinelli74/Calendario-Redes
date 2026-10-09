@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
 <base target="_top">
 <meta charset="utf-8">
@@ -185,6 +185,25 @@ select.mini{cursor:pointer}
 .g-tools{display:flex;align-items:center;gap:10px;margin:0 0 10px;flex-wrap:wrap}
 .g-tools label{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .g-note{font-size:12.5px;color:var(--muted)}
+.g-tools .btn{padding:5px 11px;font-size:13px}
+
+/* ---------- exportar */
+.modal{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(10,14,20,.34);padding:16px}
+.modal-card{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);width:min(460px,100%);display:flex;flex-direction:column;max-height:calc(100vh - 32px);overflow:auto}
+.modal-body{padding:6px 20px 18px;display:grid;grid-template-columns:1fr 120px;gap:16px 18px;align-items:start}
+.modal-body .opts{display:flex;flex-direction:column;gap:14px}
+.modal-body h2{margin:0;font-size:18px;font-weight:650;letter-spacing:-.015em;grid-column:1/-1}
+.modal .seg{background:var(--surface-2)}
+.sheet-wrap{display:grid;place-items:center;height:130px}
+.sheet{background:#fff;border:1px solid var(--border-strong);border-radius:3px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;transition:width .2s,height .2s;display:flex;flex-direction:column;padding:6px;gap:3px}
+.sheet i{display:block;height:3px;border-radius:2px;background:#dfe3ea}
+.sheet i:first-child{width:55%;height:4px;background:#9aa3af;margin-bottom:3px}
+.sheet b{display:block;height:3px;border-radius:2px}
+.sheet .cap{position:absolute;right:5px;bottom:4px;font:600 10px Inter,system-ui,sans-serif;color:#8b939f}
+.exp-info{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted);line-height:1.55;background:var(--surface-2);border-radius:10px;padding:10px 12px}
+.exp-info b{color:var(--text)}
+.exp-warn{display:block;margin-top:6px;color:var(--gap-ink);font-weight:550}
+@media (max-width: 480px){ .modal-body{grid-template-columns:1fr} .sheet-wrap{display:none} }
 .zoom{display:flex;align-items:center;border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden}
 .zoom button{border:0;background:none;padding:5px 10px;font-size:13px;font-weight:550;color:var(--muted)}
 .zoom button+button{border-left:1px solid var(--border)}
@@ -324,6 +343,7 @@ kbd{font:11px/1 ui-monospace,monospace;border:1px solid var(--border-strong);bor
   <div class="top-right">
     <span class="sync" id="sync" data-s="loading"><i></i><span>Conectando…</span></span>
     <span id="whoWrap"></span>
+    <button class="icon-btn" id="themeBtn" title="Cambiar tema claro / oscuro"></button>
     <a class="icon-btn" id="sheetLink" target="_blank" rel="noopener" title="Abrir la planilla de Google Sheets" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 9v12"/></svg></a>
     <button class="btn primary" id="btnNew" title="Nuevo contenido (N)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nuevo</span></button>
   </div>
@@ -362,6 +382,21 @@ kbd{font:11px/1 ui-monospace,monospace;border:1px solid var(--border-strong);bor
 
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="modal" id="expModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="expH">
+    <div class="dr-head"><span class="dr-kicker">Gantt</span><span class="spacer"></span><button class="icon-btn" data-x title="Cerrar (Esc)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="modal-body">
+      <h2 id="expH">Exportar a PDF</h2>
+      <div class="opts">
+        <div class="fld">Tamaño de hoja<div class="seg" data-opt="size"><button data-v="a4">A4</button><button data-v="a3">A3</button></div></div>
+        <div class="fld">Orientación<div class="seg" data-opt="orient"><button data-v="h">Horizontal</button><button data-v="v">Vertical</button></div></div>
+      </div>
+      <div class="sheet-wrap"><div class="sheet" id="expSheet"></div></div>
+      <p class="exp-info" id="expInfo"></p>
+    </div>
+    <div class="dr-foot"><button class="btn" data-x>Cancelar</button><button class="btn primary" id="expGo"></button></div>
+  </div>
+</div>
 <div class="toasts" id="toasts"></div>
 <div class="tip" id="tip"></div>
 <datalist id="dlResp"></datalist>
@@ -380,6 +415,9 @@ const IC = {
   x:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   swap:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
   copy:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+  download:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  moon:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
+  sun:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg>',
   trash:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
 };
 
@@ -552,10 +590,13 @@ const S = {
   user: prefs.user || '',
   email: '', ready: false, inflight: 0, drag: null, dirty: false,
   drawer: null, scrollToToday: true, editingWho: false,
+  theme: prefs.theme === 'dark' ? 'dark' : 'light',
+  exp: Object.assign({ size: 'a4', orient: 'h' }, prefs.exp || {}),
 };
+document.documentElement.dataset.theme = S.theme;
 function loadPrefs(){ try { return JSON.parse(localStorage.getItem('calcont-prefs') || '{}'); } catch(e){ return {}; } }
 function savePrefs(){
-  try { localStorage.setItem('calcont-prefs', JSON.stringify({ view:S.view, mode:S.period.mode, from:S.period.from, to:S.period.to, hidden:[...S.hidden], group:S.group, gz:S.gz, user:S.user })); } catch(e){}
+  try { localStorage.setItem('calcont-prefs', JSON.stringify({ view:S.view, mode:S.period.mode, from:S.period.from, to:S.period.to, hidden:[...S.hidden], group:S.group, gz:S.gz, user:S.user, theme:S.theme, exp:S.exp })); } catch(e){}
 }
 
 const $ = (s, r=document) => r.querySelector(s);
@@ -794,6 +835,15 @@ function groupKey(it){
   if (S.group === 'responsable') return it.responsable || '(sin responsable)';
   return '';
 }
+function ganttGroups(items){
+  if (S.group === 'none') return [['', items]];
+  const m = new Map();
+  items.forEach(i => { const k = groupKey(i); if (!m.has(k)) m.set(k, []); m.get(k).push(i); });
+  const keys = [...m.keys()];
+  if (S.group === 'estado'){ const order = allEstados(); keys.sort((a, b) => order.indexOf(a) - order.indexOf(b)); }
+  else keys.sort((a, b) => (a.startsWith('(') ? 1 : 0) - (b.startsWith('(') ? 1 : 0) || a.localeCompare(b));
+  return keys.map(k => [k, m.get(k)]);
+}
 function geom(fecha, inicio, f, dw, days){
   const g = { ms: (D.diff(f, fecha) + 0.5) * dw, bar: null };
   if (D.valid(inicio) && inicio < fecha){
@@ -844,16 +894,7 @@ function renderGantt(){
 
   // filas (con grupos opcionales)
   let rows = '';
-  const groups = [];
-  if (S.group === 'none') groups.push(['', items]);
-  else {
-    const m = new Map();
-    items.forEach(i => { const k = groupKey(i); if (!m.has(k)) m.set(k, []); m.get(k).push(i); });
-    let keys = [...m.keys()];
-    if (S.group === 'estado'){ const order = allEstados(); keys.sort((a, b) => order.indexOf(a) - order.indexOf(b)); }
-    else keys.sort((a, b) => (a.startsWith('(') ? 1 : 0) - (b.startsWith('(') ? 1 : 0) || a.localeCompare(b));
-    keys.forEach(k => groups.push([k, m.get(k)]));
-  }
+  const groups = ganttGroups(items);
   groups.forEach(([k, list]) => {
     if (k) rows += '<div class="g-row g-grp"><div class="g-label" style="width:' + LW + 'px">' +
       (S.group === 'estado' ? '<span class="dot" style="background:' + esc(colorOf(k)) + '"></span>' : '') + esc(k) + ' · ' + list.length + '</div><div class="g-track" style="width:' + W + 'px"></div></div>';
@@ -875,6 +916,7 @@ function renderGantt(){
     [['none','Nada'],['estado','Estado'],['formato','Formato'],['red','Red'],['responsable','Responsable']].map(([v, l]) => '<option value="' + v + '"' + (S.group === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>';
   const tools = '<div class="g-tools">' + groupSel +
     '<div class="zoom"><button data-zoom="-1" title="Alejar">−</button><button data-zoom="0" title="Ajustar al ancho">Ajustar</button><button data-zoom="1" title="Acercar">+</button></div>' +
+    '<button class="btn" data-act="export" title="Exportar el Gantt a una hoja A4 o A3">' + IC.download + ' Exportar PDF</button>' +
     '<span class="g-note">Arrastrá el rombo para cambiar la fecha de publicación · la barra marca el período de producción' + (noDate ? ' · <b>' + noDate + '</b> sin fecha (ver en Contenidos)' : '') + '</span></div>';
 
   main.innerHTML = tools + '<div class="gantt" id="gantt"><div class="g-scroll"><div class="g-inner" style="width:' + (LW + W) + 'px">' +
@@ -942,6 +984,274 @@ function gUp(){
     const it = byId(g.id);
     patchItem(g.id, patch, { undo: '“' + it.titulo + '” → ' + (patch.fecha ? D.short(patch.fecha) : 'inicio ' + D.short(patch.inicio)) });
   } else safeRender();
+}
+
+/* =====================================================================
+   Exportar el Gantt a PDF: una sola hoja, A4/A3, a color y siempre en claro
+   ===================================================================== */
+const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+let jspdfP = null;
+function loadJsPDF(){
+  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+  if (!jspdfP) jspdfP = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = JSPDF_URL;
+    sc.onload = () => window.jspdf ? res(window.jspdf.jsPDF) : rej(new Error('el generador de PDF no cargó'));
+    sc.onerror = () => { jspdfP = null; sc.remove(); rej(new Error('no se pudo cargar el generador de PDF. Revisá la conexión a internet.')); };
+    document.head.appendChild(sc);
+  });
+  return jspdfP;
+}
+function ganttRows(){
+  const [f, t] = range();
+  const items = S.items.filter(i => passesFilters(i) && inRange(i, f, t)).sort(byDate);
+  return { f, t, items, groups: ganttGroups(items) };
+}
+function filtersSummary(){
+  const p = [];
+  if (S.f.formato) p.push('Formato: ' + S.f.formato);
+  if (S.f.red) p.push('Red: ' + S.f.red);
+  if (S.f.resp) p.push('Responsable: ' + S.f.resp);
+  if (S.f.q) p.push('Búsqueda: "' + S.f.q + '"');
+  const hid = allEstados().filter(e => S.hidden.has(e) && e !== 'ELIMINADO');
+  if (hid.length) p.push('Sin: ' + hid.join(', '));
+  if (S.group !== 'none') p.push('Agrupado por ' + S.group);
+  return p.join('  ·  ');
+}
+const SHEET_CAP = { a4: { h: 55, v: 90 }, a3: { h: 85, v: 130 } };
+function openExport(){ paintExport(); $('#expModal').hidden = false; setTimeout(() => $('#expGo').focus(), 30); }
+function closeExport(){ $('#expModal').hidden = true; }
+function paintExport(){
+  const { size, orient } = S.exp;
+  $$('#expModal .seg[data-opt]').forEach(seg => $$('button', seg).forEach(b => b.setAttribute('aria-pressed', S.exp[seg.dataset.opt] === b.dataset.v)));
+  // miniatura de la hoja
+  const big = size === 'a3' ? 1 : 0.82, land = orient === 'h';
+  const sh = $('#expSheet');
+  sh.style.width = Math.round((land ? 118 : 84) * big) + 'px';
+  sh.style.height = Math.round((land ? 84 : 118) * big) + 'px';
+  const cols = ['#22C55E', '#EAB308', '#3B82F6', '#A855F7', '#EAB308', '#94A3B8'];
+  sh.innerHTML = '<i></i>' + cols.map((c, i) => '<b style="background:' + c + ';opacity:.75;width:' + (20 + i * 9) + '%;margin-left:' + (8 + i * 9) + '%"></b>').join('') + '<span class="cap">' + size.toUpperCase() + '</span>';
+  // texto
+  const g = ganttRows();
+  const n = g.items.length, rows = n + (S.group === 'none' ? 0 : g.groups.length);
+  const fs = filtersSummary();
+  let info = 'Se exporta lo que estás viendo: <b>' + esc(periodLabel()) + '</b>' + (fs ? ' · ' + esc(fs) : '') +
+    ' · <b>' + n + '</b> contenido' + (n === 1 ? '' : 's') + ' en una sola hoja ' + size.toUpperCase() + ' ' + (land ? 'horizontal' : 'vertical') + ', a color.';
+  if (!n) info += '<span class="exp-warn">No hay contenidos en este período con los filtros actuales.</span>';
+  else if (rows > SHEET_CAP[size][orient]){
+    const alt = [size === 'a4' ? 'A3' : '', land ? 'vertical' : '', 'un período más corto'].filter(Boolean);
+    info += '<span class="exp-warn">Son muchos contenidos para una hoja y el texto va a quedar chico. Probá ' + alt.slice(0, -1).join(', ') + (alt.length > 1 ? ' o ' : '') + alt[alt.length - 1] + '.</span>';
+  }
+  $('#expInfo').innerHTML = info;
+  const go = $('#expGo');
+  go.disabled = !n;
+  go.innerHTML = IC.download + ' Descargar PDF';
+}
+async function doExport(){
+  const go = $('#expGo');
+  go.disabled = true; go.textContent = 'Generando…';
+  try {
+    const { doc, name } = await buildGanttPDF(S.exp.size, S.exp.orient);
+    try { doc.save(name); } catch (e){ window.open(doc.output('bloburl'), '_blank'); }
+    closeExport();
+    toast('PDF listo: ' + name);
+  } catch (e){
+    toast('No se pudo exportar: ' + ((e && e.message) || e), { kind: 'err' });
+  } finally { paintExport(); }
+}
+
+// jsPDF usa las fuentes estándar (WinAnsi): se limpian caracteres que no puede dibujar
+const pdfTxt = s => String(s ?? '').replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/…/g, '...').replace(/[^\x20-\x7E\xA0-\xFF]/g, '').trim();
+function hexRgb(h){
+  h = String(h || '#94A3B8').replace('#', '');
+  if (h.length === 3) h = h.replace(/./g, c => c + c);
+  const n = parseInt(h, 16);
+  return isNaN(n) ? [148, 163, 184] : [n >> 16 & 255, n >> 8 & 255, n & 255];
+}
+const tint = (rgb, k) => rgb.map(v => Math.round(v + (255 - v) * k));
+function fitTxt(doc, s, w){
+  if (doc.getTextWidth(s) <= w) return s;
+  while (s.length > 1 && doc.getTextWidth(s + '...') > w) s = s.slice(0, -1);
+  return s.trimEnd() + '...';
+}
+function pdfDiamond(doc, cx, cy, r, rgb, filled){
+  doc.setLineWidth(filled ? 0.18 : 0.3);
+  doc.setDrawColor(...(filled ? [255, 255, 255] : rgb));
+  doc.setFillColor(...rgb);
+  doc.lines([[r, r], [-r, r], [-r, -r], [r, -r]], cx, cy - r, [1, 1], filled ? 'FD' : 'S', true);
+}
+async function buildGanttPDF(size, orient){
+  const JsPDF = await loadJsPDF();
+  const land = orient !== 'v';
+  const doc = new JsPDF({ orientation: land ? 'landscape' : 'portrait', unit: 'mm', format: size, compress: true });
+  const PW = doc.internal.pageSize.getWidth(), PH = doc.internal.pageSize.getHeight();
+  const k = size === 'a3' ? 1.3 : 1;          // escala de textos y márgenes
+  const M = 9 * k;
+  const INK = [21, 25, 34], MUTED = [90, 99, 113], FAINT = [139, 147, 159], LINE = [214, 219, 226], GRID = [234, 237, 241];
+  const { f, t, items, groups } = ganttRows();
+  const days = D.diff(f, t) + 1, today = D.today();
+  doc.setProperties({ title: 'Gantt de contenidos - ' + pdfTxt(periodLabel()), creator: 'Calendario de contenidos' });
+
+  // ----- encabezado
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15 * k); doc.setTextColor(...INK);
+  doc.text('Calendario de contenidos', M, M + 4.5 * k);
+  const now = new Date();
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5 * k); doc.setTextColor(...FAINT);
+  doc.text('Generado ' + p2(now.getDate()) + '/' + p2(now.getMonth() + 1) + '/' + now.getFullYear() + ' ' + p2(now.getHours()) + ':' + p2(now.getMinutes()), PW - M, M + 4.5 * k, { align: 'right' });
+  doc.setFontSize(9 * k); doc.setTextColor(...MUTED);
+  const fs = filtersSummary();
+  const sub = periodLabel() + '·  ' + items.length + ' contenido' + (items.length === 1 ? '' : 's') + (fs ? '  ·  ' + fs : '');
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(...INK);
+  const pl = pdfTxt(periodLabel());
+  doc.text(pl, M, M + 10.5 * k);
+  const plW = doc.getTextWidth(pl);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(...MUTED);
+  const gapW = doc.getTextWidth('  ');
+  doc.text(fitTxt(doc, pdfTxt(sub.slice(periodLabel().length)), PW - 2 * M - plW - gapW), M + plW + gapW, M + 10.5 * k);
+
+  // ----- leyenda de estados presentes
+  const present = allEstados().filter(e => items.some(i => (i.estado || 'Idea') === e));
+  let lx = M, ly = M + 16.5 * k;
+  doc.setFontSize(7.5 * k);
+  present.forEach(e => {
+    const lbl = pdfTxt(e), w = doc.getTextWidth(lbl) + 8 * k;
+    if (lx + w > PW - M){ lx = M; ly += 4.6 * k; }
+    pdfDiamond(doc, lx + 1.5 * k, ly - 0.95 * k, 1.35 * k, hexRgb(colorOf(e)), !DEAD.includes(e));
+    doc.setTextColor(...MUTED); doc.text(lbl, lx + 4 * k, ly);
+    lx += w;
+  });
+
+  // ----- geometría del gráfico
+  const top = ly + 3.5 * k;
+  const bottom = PH - M - 5 * k;
+  const LW = (land ? 68 : 60) * k;
+  const x0 = M + LW, tw = PW - M - x0, dw = tw / days;
+  const monthH = 5.5 * k, dayH = dw >= 3.4 ? 7 * k : 4.8 * k;
+  const hy = top + monthH + dayH;
+  const rowsArr = [];
+  groups.forEach(([gk, list]) => { if (gk) rowsArr.push({ grp: gk, n: list.length }); list.forEach(it => rowsArr.push({ it })); });
+  const rowH = rowsArr.length ? Math.min(7 * k, (bottom - hy) / rowsArr.length) : 7 * k;
+  const ey = hy + rowsArr.length * rowH;
+
+  // filas cebra
+  rowsArr.forEach((r, i) => { if (!r.grp && i % 2){ doc.setFillColor(250, 251, 252); doc.rect(M, hy + i * rowH, PW - 2 * M, rowH, 'F'); } });
+  // fines de semana y días futuros sin contenido
+  const cnt = {};
+  S.items.forEach(i => { if (passesFilters(i) && D.valid(i.fecha) && !DEAD.includes(i.estado)) cnt[i.fecha] = (cnt[i.fecha] || 0) + 1; });
+  for (let i = 0, d = f; i < days; i++, d = D.add(d, 1)){
+    const wd = D.dow(d);
+    if (wd === 0 || wd === 6){ doc.setFillColor(242, 243, 246); doc.rect(x0 + i * dw, top + monthH, dw, ey - top - monthH, 'F'); }
+    else if (!cnt[d] && d >= today){ doc.setFillColor(255, 246, 222); doc.rect(x0 + i * dw, top + monthH, dw, ey - top - monthH, 'F'); }
+  }
+  // filas de grupo
+  rowsArr.forEach((r, i) => { if (r.grp){ doc.setFillColor(238, 241, 245); doc.rect(M, hy + i * rowH, PW - 2 * M, rowH, 'F'); } });
+  // líneas de días
+  if (dw >= 1.6){
+    doc.setDrawColor(...GRID); doc.setLineWidth(0.1);
+    for (let i = 1; i < days; i++) doc.line(x0 + i * dw, top + monthH, x0 + i * dw, ey);
+  }
+  // líneas de filas
+  if (rowH >= 2.2){
+    doc.setDrawColor(...GRID); doc.setLineWidth(0.1);
+    for (let i = 1; i < rowsArr.length; i++) doc.line(M, hy + i * rowH, PW - M, hy + i * rowH);
+  }
+
+  // ----- cabecera de meses y días
+  const dfs = Math.max(3, Math.min(6.5 * k, dw * 2.835 * 0.5));
+  for (let i = 0, d = f; i < days; i++, d = D.add(d, 1)){
+    const x = x0 + i * dw, wd = D.dow(d);
+    if (i === 0 || D.d(d) === 1){
+      const end = Math.min(D.diff(f, D.mEnd(d)) + 1, days), w = (end - i) * dw;
+      if (i){ doc.setDrawColor(...LINE); doc.setLineWidth(0.25); doc.line(x, top, x, ey); }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5 * k); doc.setTextColor(...INK);
+      const lbl = w > 30 * k ? MONL[D.m(d)] + ' ' + D.y(d) : w > 9 * k ? MONL[D.m(d)].slice(0, 3) : '';
+      if (lbl) doc.text(fitTxt(doc, lbl, w - 2), x + 1.5, top + monthH - 1.6 * k);
+    }
+    const sparse = dw < 2.4, showN = !sparse || wd === 1;
+    doc.setFontSize(sparse ? 5.5 * k : dfs);
+    if (dw >= 3.4){
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(...FAINT);
+      doc.text('DLMMJVS'.charAt(wd), x + dw / 2, top + monthH + 2.7 * k, { align: 'center' });
+    }
+    if (showN){
+      const ny = top + monthH + dayH - 1.5 * k;
+      if (d === today){
+        doc.setFillColor(229, 72, 77);
+        const bw = Math.max(dw - 0.5, doc.getTextWidth(String(D.d(d))) + 1.2), bh = dfs * 0.3528 + 1.2;
+        doc.roundedRect(x + dw / 2 - bw / 2, ny - bh + 0.6, bw, bh, 0.6, 0.6, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      } else { doc.setFont('helvetica', 'bold'); doc.setTextColor(...INK); }
+      doc.text(String(D.d(d)), x + dw / 2, ny, { align: 'center' });
+    }
+  }
+  // títulos de columnas de la etiqueta
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5 * k); doc.setTextColor(...FAINT);
+  doc.text('CONTENIDO', M + 2, hy - 1.8 * k);
+  doc.text('FECHA', x0 - 2, hy - 1.8 * k, { align: 'right' });
+
+  // marco
+  doc.setDrawColor(...LINE); doc.setLineWidth(0.25);
+  doc.line(x0, top + monthH, PW - M, top + monthH);
+  doc.line(M, hy, PW - M, hy);
+  doc.line(x0, top, x0, Math.max(ey, hy));
+  doc.rect(M, top, PW - 2 * M, Math.max(ey, hy) - top, 'S');
+
+  // hoy
+  if (today >= f && today <= t && rowsArr.length){
+    const x = x0 + (D.diff(f, today) + 0.5) * dw;
+    doc.setDrawColor(229, 72, 77); doc.setLineWidth(0.35);
+    doc.line(x, hy, x, ey);
+  }
+
+  // ----- filas
+  const lfs = Math.max(2.4, Math.min(8 * k, rowH * 2.835 * 0.56));
+  rowsArr.forEach((r, i) => {
+    const y = hy + i * rowH, cy = y + rowH / 2;
+    if (r.grp){
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(lfs); doc.setTextColor(...MUTED);
+      let tx = M + 2;
+      if (S.group === 'estado'){ doc.setFillColor(...hexRgb(colorOf(r.grp))); doc.circle(M + 2.8, cy, Math.min(1.1 * k, rowH * 0.22), 'F'); tx = M + 5; }
+      doc.text(fitTxt(doc, pdfTxt(r.grp.toUpperCase() + '  ·  ' + r.n), LW - 6), tx, cy, { baseline: 'middle' });
+      return;
+    }
+    const it = r.it, est = it.estado || 'Idea', rgb = hexRgb(colorOf(est)), dead = DEAD.includes(est);
+    doc.setFillColor(...rgb); doc.circle(M + 2.8, cy, Math.min(1.1 * k, rowH * 0.22), 'F');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(lfs);
+    const dTxt = p2(D.d(it.fecha)) + '/' + p2(D.m(it.fecha) + 1);
+    const dW = doc.getTextWidth(dTxt);
+    doc.setTextColor(...FAINT); doc.text(dTxt, x0 - 2, cy, { align: 'right', baseline: 'middle' });
+    doc.setFont('helvetica', dead ? 'normal' : 'bold'); doc.setTextColor(...(dead ? FAINT : INK));
+    const title = fitTxt(doc, pdfTxt(it.titulo) || '(sin título)', LW - dW - 10);
+    doc.text(title, M + 5, cy, { baseline: 'middle' });
+    if (dead){ doc.setDrawColor(...FAINT); doc.setLineWidth(0.15); doc.line(M + 5, cy, M + 5 + doc.getTextWidth(title), cy); }
+    // barra de producción
+    if (D.valid(it.inicio) && it.inicio < it.fecha){
+      const s0 = Math.max(D.diff(f, it.inicio), 0), e0 = Math.min(D.diff(f, it.fecha), days - 1);
+      if (e0 >= s0){
+        const bh = Math.max(0.8, rowH * 0.46), rr = Math.min(0.8, bh / 2);
+        doc.setFillColor(...tint(rgb, 0.72)); doc.setDrawColor(...tint(rgb, 0.2)); doc.setLineWidth(0.15);
+        doc.roundedRect(x0 + s0 * dw + 0.2, cy - bh / 2, Math.max((e0 - s0 + 1) * dw - 0.4, 0.6), bh, rr, rr, 'FD');
+      }
+    }
+    // rombo de publicación
+    if (it.fecha <= t){
+      const rd = Math.max(0.6, Math.min(rowH * 0.36, 2.1 * k, Math.max(dw * 0.5, 1)));
+      pdfDiamond(doc, x0 + (D.diff(f, it.fecha) + 0.5) * dw, cy, rd, rgb, !dead);
+    }
+  });
+  if (!rowsArr.length){
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10 * k); doc.setTextColor(...MUTED);
+    doc.text('No hay contenidos en este período con los filtros actuales.', PW / 2, hy + 14 * k, { align: 'center' });
+  }
+
+  // ----- pie
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8 * k); doc.setTextColor(...FAINT);
+  const fy = PH - M + 0.5 * k;
+  doc.text('Rombo: fecha de publicación  ·  Barra: período de producción  ·  Línea roja: hoy  ·  Amarillo: días sin contenido', M, fy);
+  doc.text('Marketing · Publicidad digital', PW - M, fy, { align: 'right' });
+
+  const name = 'Gantt ' + f + ' a ' + t + ' (' + size.toUpperCase() + ' ' + (land ? 'horizontal' : 'vertical') + ').pdf';
+  return { doc, name };
 }
 
 /* =====================================================================
@@ -1226,6 +1536,7 @@ function bindUI(){
   main.addEventListener('click', e => {
     const a = e.target.closest('[data-act]');
     if (a && a.dataset.act === 'add') return openNew(a.dataset.date);
+    if (a && a.dataset.act === 'export') return openExport();
     if (a && a.dataset.act === 'seed'){
       a.disabled = true; a.textContent = 'Cargando…';
       const list = SEED.map(({ id, version, actualizado, por, ...rest }) => rest);
@@ -1304,6 +1615,7 @@ function bindUI(){
 
   // atajos de teclado
   document.addEventListener('keydown', e => {
+    if (!$('#expModal').hidden){ if (e.key === 'Escape') closeExport(); return; }
     if (e.key === 'Escape' && S.drawer){ closeDrawer(); return; }
     if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === '/'){ e.preventDefault(); $('#q').focus(); }
@@ -1312,6 +1624,18 @@ function bindUI(){
     else if (e.key === 'ArrowLeft' && !S.drawer) shiftPeriod(-1);
     else if (e.key === 'ArrowRight' && !S.drawer) shiftPeriod(1);
     else if (e.key === 'g' || e.key === 'G'){ S.view = S.view === 'lista' ? 'gantt' : 'lista'; renderAll(); }
+  });
+  // tema
+  const paintTheme = () => { $('#themeBtn').innerHTML = S.theme === 'dark' ? IC.sun : IC.moon; };
+  paintTheme();
+  $('#themeBtn').onclick = () => { S.theme = S.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = S.theme; paintTheme(); savePrefs(); };
+  // exportar
+  const em = $('#expModal');
+  em.addEventListener('click', e => {
+    if (e.target === em || e.target.closest('[data-x]')) return closeExport();
+    const b = e.target.closest('.seg[data-opt] button');
+    if (b){ S.exp[b.parentNode.dataset.opt] = b.dataset.v; savePrefs(); paintExport(); return; }
+    if (e.target.closest('#expGo')) doExport();
   });
   let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { if (S.view === 'gantt') safeRender(); }, 150); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
